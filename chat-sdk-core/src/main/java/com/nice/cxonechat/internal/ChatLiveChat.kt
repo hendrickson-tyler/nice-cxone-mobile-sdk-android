@@ -38,7 +38,7 @@ internal class ChatLiveChat(
     private var availabilityExpiration = Date(0)
 
     init {
-        isChatAvailable = false
+        isChatAvailable = true
 
         origin.socketListener.addListener(
             SocketConnectionListener(
@@ -49,24 +49,25 @@ internal class ChatLiveChat(
     }
 
     private fun getAvailability(): Boolean {
-        if (availabilityExpiration.before(DateProvider.now())) {
-            origin
-                .service
-                .getChannelAvailability(
-                    origin.connection.brandId.toString(),
-                    origin.connection.channelId
-                )
-                .execute()
-                .onSuccess {
-                    availabilityExpiration = DateProvider.now() + AVAILABILTY_TTL
-                    isChatAvailable = body()?.isOnline != false
-                }
-                .onFailure {
-                    isChatAvailable = false
-                }
-        }
-
-        return isChatAvailable
+        return true
+//        if (availabilityExpiration.before(DateProvider.now())) {
+//            origin
+//                .service
+//                .getChannelAvailability(
+//                    origin.connection.brandId.toString(),
+//                    origin.connection.channelId
+//                )
+//                .execute()
+//                .onSuccess {
+//                    availabilityExpiration = DateProvider.now() + AVAILABILTY_TTL
+//                    isChatAvailable = body()?.isOnline != false
+//                }
+//                .onFailure {
+//                    isChatAvailable = false
+//                }
+//        }
+//
+//        return isChatAvailable
     }
 
     override fun getChannelAvailability(callback: (Boolean) -> Unit): Cancellable {
