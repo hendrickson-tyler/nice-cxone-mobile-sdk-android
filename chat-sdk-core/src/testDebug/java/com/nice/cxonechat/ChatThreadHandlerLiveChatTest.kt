@@ -19,7 +19,6 @@ import com.nice.cxonechat.exceptions.InvalidStateException
 import com.nice.cxonechat.internal.copy.ChatThreadCopyable.Companion.asCopyable
 import com.nice.cxonechat.internal.model.ChatThreadMutable
 import com.nice.cxonechat.internal.model.ChatThreadMutable.Companion.asMutable
-import com.nice.cxonechat.internal.model.CustomFieldInternal
 import com.nice.cxonechat.internal.model.MessageModel
 import com.nice.cxonechat.internal.model.network.EventCaseStatusChanged.CaseStatus.Closed
 import com.nice.cxonechat.model.makeAgent
@@ -32,7 +31,6 @@ import com.nice.cxonechat.thread.ChatThreadState
 import com.nice.cxonechat.thread.CustomField
 import com.nice.cxonechat.tool.nextString
 import org.junit.Test
-import java.util.Date
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
@@ -71,7 +69,7 @@ internal class ChatThreadHandlerLiveChatTest : AbstractChatTest() {
         val caseCustomFields = listOf(
             makeCustomField(),
             makeCustomField()
-        )
+        ).sortedBy(CustomField::id)
         val expected = chatThread.asCopyable().copy(
             contactId = TestContactId,
             scrollToken = scrollToken,
