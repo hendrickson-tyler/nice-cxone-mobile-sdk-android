@@ -50,7 +50,7 @@ android {
         buildConfig.sourceSets.named(variant.name) {
             className.set("BuildConfig")
             packageName("com.nice.cxonechat.core")
-            buildConfigField(String, "VERSION_NAME", provider { project.version })
+            buildConfigField(String, "VERSION_NAME", "2.3.0")
             buildConfigField(Boolean, "DEBUG", variant.buildType.isDebuggable())
         }
     }
