@@ -15,6 +15,7 @@
 
 package com.nice.cxonechat.sample.ui.theme
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,9 +28,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.nice.cxonechat.sample.R.drawable
 import com.nice.cxonechat.sample.R.string
 import androidx.compose.material3.FloatingActionButton as MaterialFab
@@ -54,7 +57,11 @@ fun AppTheme.OutlinedButton(
 ) {
     OutlinedButton(
         onClick = onClick,
-        modifier = modifier,
+        modifier = Modifier
+            .testTag("button_$text")
+            .then(modifier),
+        border = BorderStroke(width = 1.dp, color = colorScheme.primary),
+        shape = Shapes.medium,
         enabled = enabled,
         colors = buttonColors(isDefault),
     ) {
@@ -65,7 +72,7 @@ fun AppTheme.OutlinedButton(
 @Composable
 private fun AppTheme.buttonColors(isDefault: Boolean): ButtonColors {
     val background = if (isDefault) colorScheme.primary else Color.Transparent
-    return ButtonDefaults.buttonColors(
+    return ButtonDefaults.outlinedButtonColors(
         containerColor = background,
         contentColor = contentColorFor(background)
     )
@@ -83,7 +90,11 @@ fun AppTheme.ContinueButton(onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Center,
     ) {
-        OutlinedButton(stringResource(string.continue_button), onClick = onClick)
+        OutlinedButton(
+            text = stringResource(string.continue_button),
+            modifier = Modifier.testTag("continue_button"),
+            onClick = onClick
+        )
     }
 }
 
@@ -94,7 +105,7 @@ fun AppTheme.ContinueButton(onClick: () -> Unit) {
  */
 @Composable
 fun AppTheme.ChatFab(onClick: () -> Unit) {
-    MaterialFab(onClick = onClick, containerColor = colorScheme.primary) {
+    MaterialFab(onClick = onClick, containerColor = colorScheme.primary, modifier = Modifier.testTag("open_chat_fab")) {
         Icon(painterResource(drawable.ic_chat_24px), stringResource(string.open_chat))
     }
 }

@@ -17,11 +17,14 @@
 
 package com.nice.cxonechat
 
-import com.nice.cxonechat.ChatThreadEventHandlerActions.archiveThread
 import com.nice.cxonechat.ChatThreadEventHandlerActions.loadMetadata
 import com.nice.cxonechat.ChatThreadEventHandlerActions.markThreadRead
+import com.nice.cxonechat.ChatThreadEventHandlerActions.triggerAction
 import com.nice.cxonechat.ChatThreadEventHandlerActions.typingEnd
 import com.nice.cxonechat.ChatThreadEventHandlerActions.typingStart
+import com.nice.cxonechat.event.thread.PostbackEvent
+import com.nice.cxonechat.internal.model.ActionInternal
+import com.nice.cxonechat.internal.model.ActionKtx.toEvent
 import com.nice.cxonechat.model.makeChatThread
 import com.nice.cxonechat.server.ServerRequest
 import com.nice.cxonechat.thread.ChatThread
@@ -39,15 +42,6 @@ internal class ChatThreadEventTest : AbstractChatTest() {
     }
 
     // ---
-
-    @Test
-    fun trigger_ArchiveThreadEvent_sendsExpectedMessage() {
-        val id = thread.id
-        assertSendText(ServerRequest.ArchiveThread(connection, thread), id.toString()) {
-            @Suppress("DEPRECATION")
-            events.archiveThread()
-        }
-    }
 
     @Test
     fun trigger_MarkThreadReadEvent_sendsExpectedMessage() {
@@ -78,6 +72,24 @@ internal class ChatThreadEventTest : AbstractChatTest() {
         val id = thread.id
         assertSendText(ServerRequest.LoadThreadMetadata(connection, thread), id.toString()) {
             events.loadMetadata()
+        }
+    }
+
+    @Test
+    fun trigger_PostbackEvent_sendsExpectedMessage() {
+        val id = thread.id
+        val action = ActionInternal.PostbackReplyButton(text = "test", postback = "test")
+        assertSendText(ServerRequest.PostbackEvent(connection, thread, action.toEvent() as PostbackEvent), id.toString()) {
+            events.triggerAction(action)
+        }
+    }
+
+    @Test
+    fun trigger_ReplyButtonEvent_sendsExpectedMessage() {
+        val id = thread.id
+        val action = ActionInternal.ReplyButton(text = "test", postback = "test", null, null)
+        assertSendText(ServerRequest.SendMessage(connection, thread, storage, message = action.text, postback = action.postback), id.toString()) {
+            events.triggerAction(action)
         }
     }
 }

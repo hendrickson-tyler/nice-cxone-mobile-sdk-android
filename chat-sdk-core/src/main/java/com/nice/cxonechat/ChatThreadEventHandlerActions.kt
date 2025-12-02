@@ -17,11 +17,13 @@ package com.nice.cxonechat
 
 import com.nice.cxonechat.ChatThreadEventHandler.OnEventErrorListener
 import com.nice.cxonechat.ChatThreadEventHandler.OnEventSentListener
-import com.nice.cxonechat.event.thread.ArchiveThreadEventImpl
-import com.nice.cxonechat.event.thread.LoadThreadMetadataEventImpl
-import com.nice.cxonechat.event.thread.MarkThreadReadEventImpl
-import com.nice.cxonechat.event.thread.TypingEndEventImpl
-import com.nice.cxonechat.event.thread.TypingStartEventImpl
+import com.nice.cxonechat.event.thread.LoadThreadMetadataEvent
+import com.nice.cxonechat.event.thread.MarkThreadReadEvent
+import com.nice.cxonechat.event.thread.TypingEndEvent
+import com.nice.cxonechat.event.thread.TypingStartEvent
+import com.nice.cxonechat.exceptions.InvalidParameterException
+import com.nice.cxonechat.internal.model.ActionKtx.toEvent
+import com.nice.cxonechat.message.Action
 
 /**
  * Provides in-one-place interactions to trigger all available events.
@@ -31,17 +33,6 @@ import com.nice.cxonechat.event.thread.TypingStartEventImpl
 object ChatThreadEventHandlerActions {
 
     /**
-     * Archive the thread.
-     */
-    @JvmOverloads
-    @JvmStatic
-    @Deprecated("Use ChatThread.archive() instead.")
-    fun ChatThreadEventHandler.archiveThread(
-        listener: OnEventSentListener? = null,
-        errorListener: OnEventErrorListener? = null,
-    ) = trigger(ArchiveThreadEventImpl(), listener, errorListener)
-
-    /**
      * Mark the thread as read.
      */
     @JvmOverloads
@@ -49,7 +40,7 @@ object ChatThreadEventHandlerActions {
     fun ChatThreadEventHandler.markThreadRead(
         listener: OnEventSentListener? = null,
         errorListener: OnEventErrorListener? = null,
-    ) = trigger(MarkThreadReadEventImpl(), listener, errorListener)
+    ) = trigger(MarkThreadReadEvent(), listener, errorListener)
 
     /**
      * Notify the server that the user has stopped typing.
@@ -59,7 +50,7 @@ object ChatThreadEventHandlerActions {
     fun ChatThreadEventHandler.typingEnd(
         listener: OnEventSentListener? = null,
         errorListener: OnEventErrorListener? = null,
-    ) = trigger(TypingEndEventImpl(), listener, errorListener)
+    ) = trigger(TypingEndEvent(), listener, errorListener)
 
     /**
      * Notify the agent that the user has started typing.
@@ -69,15 +60,42 @@ object ChatThreadEventHandlerActions {
     fun ChatThreadEventHandler.typingStart(
         listener: OnEventSentListener? = null,
         errorListener: OnEventErrorListener? = null,
-    ) = trigger(TypingStartEventImpl(), listener, errorListener)
+    ) = trigger(TypingStartEvent(), listener, errorListener)
 
     /**
-     * Request additonal thread metadata.
+     * Request additional thread metadata.
      */
     @JvmOverloads
     @JvmStatic
     fun ChatThreadEventHandler.loadMetadata(
         listener: OnEventSentListener? = null,
         errorListener: OnEventErrorListener? = null,
-    ) = trigger(LoadThreadMetadataEventImpl(), listener, errorListener)
+    ) = trigger(LoadThreadMetadataEvent(), listener, errorListener)
+
+    /**
+     * Triggers an action event based on the provided [Action].
+     *
+     * @param action An instance of [Action] that defines the event to be triggered.
+     *  Only supported actions will be processed, others will result in an error.
+     *  Supported actions include:
+     *  * [Action.ReplyButton]
+     *  @param listener An optional listener to be notified when the event is sent.
+     *  @param errorListener An optional listener to be notified if an error occurs while sending
+     */
+    @JvmOverloads
+    @JvmStatic
+    fun ChatThreadEventHandler.triggerAction(
+        action: Action,
+        listener: OnEventSentListener? = null,
+        errorListener: OnEventErrorListener? = null,
+    ) {
+        val event = action.toEvent()
+        if (event == null) {
+            errorListener?.onError(
+                InvalidParameterException("Action ${action::class.simpleName} is not supported.")
+            )
+            return
+        }
+        trigger(event, listener, errorListener)
+    }
 }

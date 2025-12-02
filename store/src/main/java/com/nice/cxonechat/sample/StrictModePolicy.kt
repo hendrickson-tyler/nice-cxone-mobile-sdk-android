@@ -15,6 +15,7 @@
 
 package com.nice.cxonechat.sample
 
+import android.annotation.SuppressLint
 import android.os.Build
 import android.os.PatternMatcher
 import android.os.StrictMode
@@ -22,7 +23,9 @@ import android.os.StrictMode.ThreadPolicy
 import android.os.StrictMode.VmPolicy
 import android.os.strictmode.DiskReadViolation
 import android.os.strictmode.ExplicitGcViolation
+import android.os.strictmode.InstanceCountViolation
 import android.os.strictmode.LeakedClosableViolation
+import android.os.strictmode.ServiceConnectionLeakedViolation
 import android.os.strictmode.UntaggedSocketViolation
 import androidx.annotation.RequiresApi
 import com.nice.cxonechat.sample.data.repository.ChatSettingsRepository
@@ -57,10 +60,10 @@ internal object StrictModePolicy {
                 classNamed(ChatSettingsRepository::class.qualifiedName!!, "load"),
             )
         ),
-        // Appium automated test hooks into Android Activity are causing DiskReadViolation
+        // Appium automated test hooks into Android Activity are causing DiskReadViolation, ServiceConnectionLeakedViolation
         allow(
             allOf(
-                violation(DiskReadViolation::class),
+                violation(DiskReadViolation::class, ServiceConnectionLeakedViolation::class),
                 classNamed(PatternMatcher("com.nexperience.android.", PatternMatcher.PATTERN_PREFIX))
             )
         ),
@@ -117,6 +120,14 @@ internal object StrictModePolicy {
                 classNamed("com.samsung.android.feature.SemCscFeature", "isUseOdmProduct")
             )
         ),
+        // Samsung Galaxy Note10+ - Android 12
+        allow(
+            allOf(
+                violation(DiskReadViolation::class),
+                classNamed("android.app.ActivityThread", "getProfileSizeOfApp"),
+                { Build.BRAND.contentEquals("samsung", ignoreCase = true) }
+            )
+        ),
         // LGE - V40 ThinQ - Reported via Crashlytics
         allow(
             allOf(
@@ -131,11 +142,45 @@ internal object StrictModePolicy {
                 classNamed("android.util.BoostFramework", "<init>")
             )
         ),
+        // Samsung A25 - 5G (possibly other devices) - Android 14 - some functionality tied to its game mode
+        allow(
+            allOf(
+                violation(DiskReadViolation::class),
+                classNamed("android.content.pm.PackageManager", "isSpeg")
+            )
+        ),
         // Emulator - Android 12 - Reported via Crashlytics
         allow(
             allOf(
                 violation(DiskReadViolation::class),
                 classNamed("com.android.server.wm.WindowManagerService", "getTaskSnapshot")
+            )
+        ),
+        // Huawei Y6s - Android 9 - Reported via Crashlytics
+        allow(
+            allOf(
+                violation(DiskReadViolation::class),
+                classNamed("android.graphics.HwTypefaceUtil", "updateFont")
+            )
+        ),
+        // Xiaomi - Redmi Note 10 Pro &  Mi 11 Lite - Android 11 - Reported via Crashlytics
+        allow(
+            allOf(
+                violation(DiskReadViolation::class),
+                classNamed("miui.contentcatcher.InterceptorProxy", "create")
+            )
+        ),
+        // Debugging
+        allow(
+            allOf(
+                violation(DiskReadViolation::class),
+                classNamed("dalvik.system.VMDebug")
+            )
+        ),
+        allow(
+            allOf(
+                violation(DiskReadViolation::class),
+                classNamed("dalvik.system.InMemoryDexClassLoader")
             )
         ),
         // Perfecto instrumentation rewrites app and adds it's own methods
@@ -145,15 +190,53 @@ internal object StrictModePolicy {
                 classNamed(StoreActivity::class.qualifiedName!!, "onCreatePerfectoMobile")
             )
         ),
-        // There seems to be an issue on Android 14 and 15 that results in releasing an Activity
+        // Amazon SSO SDK
+        allow(
+            allOf(
+                violation(DiskReadViolation::class),
+                classNamed("com.amazon.identity.auth.device.StoredPreferences", "setTokenObtainedFromSSO")
+            )
+        ),
+        // Android 35 emulator - Debug - shouldShowRequestPermissionRationale
+        allow(
+            allOf(
+                violation(DiskReadViolation::class),
+                classNamed("android.app.ActivityThread\$AndroidOs", "stat")
+            )
+        ),
+        // Samsung Galaxy Note 8 - Android 8.0 - Instance is retained when using System component to select an attachment
+        @SuppressLint("ObsoleteSdkInt") // Runtime check for Android 8.0
+        if (Build.MANUFACTURER.equals("Samsung", ignoreCase = true) &&
+            Build.MODEL.equals("SM-N950", ignoreCase = true) &&
+            Build.VERSION.SDK_INT == Build.VERSION_CODES.O
+        ) {
+            allow(
+                allOf(
+                    violation(InstanceCountViolation::class),
+                )
+            )
+        } else {
+            null
+        },
+        // There seems to be an issue on Android 14, 15 and 16 that results in releasing an Activity
         // throwing an ExplicitGcViolation.  There may be something we're doing to trigger
         // it, but I don't find any more information about it.
-        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.UPSIDE_DOWN_CAKE until 36) {
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.UPSIDE_DOWN_CAKE..Build.VERSION_CODES.BAKLAVA) {
             allow(
                 allOf(
                     violation(ExplicitGcViolation::class),
                     classNamed("android.app.ActivityThread", "performDestroyActivity")
                 )
+            )
+        } else {
+            null
+        },
+        @Suppress("KotlinConstantConditions") // Build time variant
+        if (!BuildConfig.DEBUG) {
+            // For QA (Non-debug) build only log DiskReadViolation (because it occurs too often due to the Manufacturer modifications)
+            Rule(
+                violation(DiskReadViolation::class),
+                log("ThreadPolicy")
             )
         } else {
             null
@@ -186,6 +269,7 @@ internal object StrictModePolicy {
                 PatternMatcher("""com.google.firebase.""", PatternMatcher.PATTERN_PREFIX)
             )
         ),
+        // Multiple
         Rule(
             violation(UntaggedSocketViolation::class),
             log(VM_POLICY_TAG)

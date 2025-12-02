@@ -115,6 +115,7 @@ internal class ChatThreadsHandlerImpl(
         handler = ChatThreadHandlerAgentUpdate(handler, chat, mutableThread)
         handler = ChatThreadHandlerAgentTyping(handler, chat)
         handler = ChatThreadHandlerMessageReadByAgent(handler, chat, mutableThread)
+        handler = ChatThreadHandlerMessageSeenChanged(origin = handler, chat, mutableThread)
         if (chat.chatMode === LiveChat) {
             handler = ChatThreadHandlerWelcomeLiveChat(handler, chat, mutableThread)
             handler = ChatThreadHandlerLiveChat(handler, chat, mutableThread, isThreadCreated)
@@ -122,6 +123,7 @@ internal class ChatThreadsHandlerImpl(
             // The complex condition is used to avoid sending the welcome message in unit tests
             handler = ChatThreadHandlerWelcome(handler, chat, mutableThread)
         }
+        handler = ChatThreadHandlerFilter(handler, chat)
         handler = ChatThreadHandlerAggregatingListener(handler)
         return handler
     }

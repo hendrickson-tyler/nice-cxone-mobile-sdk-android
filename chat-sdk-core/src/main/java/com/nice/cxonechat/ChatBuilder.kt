@@ -27,7 +27,11 @@ import com.nice.cxonechat.internal.socket.SocketFactory
 import com.nice.cxonechat.internal.socket.SocketFactoryDefault
 import com.nice.cxonechat.log.Logger
 import com.nice.cxonechat.log.LoggerNoop
+import com.nice.cxonechat.log.ProxyLogger
+import com.nice.cxonechat.logger.RemoteLogger
 import com.nice.cxonechat.utilities.TaggingSocketFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 
 /**
@@ -89,21 +93,6 @@ interface ChatBuilder {
     fun setCustomerId(customerId: String): ChatBuilder
 
     /**
-     * Build an instance of chat asynchronously.
-     * Previously this method guaranteed an instance to be returned via [callback], this is no
-     * longer the case. If there is an communication issue with the server, this method will throw a runtime exception.
-     */
-    @CheckResult
-    @Deprecated(
-        message = "Please migrate to build method with OnChatBuildResultCallback",
-        replaceWith = ReplaceWith(
-            expression = "build(resultCallback = OnChatBuiltResultCallback { callback.onChatBuilt(it.getOrThrow()) })",
-            imports = ["com.nice.cxonechat.ChatBuilder.OnChatBuiltResultCallback"]
-        )
-    )
-    fun build(callback: OnChatBuiltCallback): Cancellable
-
-    /**
      * Builds an instance of chat asynchronously.
      * Any standard issue which may happen during will be reported as [IllegalStateException] in [Result.onFailure].
      * All failures are logged if [setDevelopmentMode] is set.
@@ -115,8 +104,6 @@ interface ChatBuilder {
      *
      * Can be called from any thread, but will change to non-main thread immediately.
      *
-     * @see OnChatBuiltCallback.onChatBuilt
-     *
      * @return A [Cancellable] which allows to cancel the asynchronous operation.
      */
     @CheckResult
@@ -126,7 +113,9 @@ interface ChatBuilder {
      * Callback allowing to listen to chat instance provisioning.
      * @see build
      * */
+    @Suppress("unused")
     @Public
+    @Deprecated("This callback is unused and will be removed in next major release.")
     fun interface OnChatBuiltCallback {
         /**
          * Notifies the consumer that a chat instance is ready. It's always called
@@ -162,8 +151,8 @@ interface ChatBuilder {
          * @param logger [Logger] which will be used by the builder and the SDK, default is no-op implementation.
          *
          * @see build
-         * @see OnChatBuiltCallback
-         * @see OnChatBuiltCallback.onChatBuilt
+         * @see OnChatBuiltResultCallback
+         * @see OnChatBuiltResultCallback.onChatBuiltResult
          * */
         @JvmOverloads
         @JvmStatic
@@ -181,8 +170,8 @@ interface ChatBuilder {
          * @param logger [Logger] which will be used by the builder and the SDK, default is no-op implementation.
          *
          * @see build
-         * @see OnChatBuiltCallback
-         * @see OnChatBuiltCallback.onChatBuilt
+         * @see OnChatBuiltResultCallback
+         * @see OnChatBuiltResultCallback.onChatBuiltResult
          * */
         @JvmOverloads
         @JvmStatic
@@ -191,21 +180,29 @@ interface ChatBuilder {
             config: SocketFactoryConfiguration,
             logger: Logger = LoggerNoop,
         ): ChatBuilder {
-            val sharedClient = OkHttpClient()
-                .newBuilder()
-                .addInterceptor { chain ->
-                    chain.proceed(
-                        chain.request()
-                            .newBuilder()
-                            .addHeader("x-sdk-platform", "android")
-                            .addHeader("x-sdk-version", BuildConfig.VERSION_NAME)
-                            .build()
-                    )
+            val sharedClient =
+                runBlocking(Dispatchers.IO) {
+                    OkHttpClient()
+                        .newBuilder()
+                        .addInterceptor { chain ->
+                            chain.proceed(
+                                chain.request()
+                                    .newBuilder()
+                                    .addHeader("x-sdk-platform", "android")
+                                    .addHeader("x-sdk-version", BuildConfig.VERSION_NAME)
+                                    .build()
+                            )
+                        }
+                        .socketFactory(TaggingSocketFactory)
+                        .build()
                 }
-                .socketFactory(TaggingSocketFactory)
-                .build()
+
             val factory = SocketFactoryDefault(config, sharedClient)
-            val entrails = ChatEntrailsAndroid(context.applicationContext, factory, config, sharedClient, logger)
+            val updateLogger = ProxyLogger(
+                RemoteLogger(BuildConfig.VERSION_NAME, sharedClient),
+                logger
+            )
+            val entrails = ChatEntrailsAndroid(context.applicationContext, factory, config, sharedClient, updateLogger)
             return invoke(
                 entrails = entrails,
                 factory = factory

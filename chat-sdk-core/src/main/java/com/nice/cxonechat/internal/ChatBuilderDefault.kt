@@ -18,17 +18,19 @@ package com.nice.cxonechat.internal
 import com.nice.cxonechat.Authorization
 import com.nice.cxonechat.Cancellable
 import com.nice.cxonechat.ChatBuilder
-import com.nice.cxonechat.ChatBuilder.OnChatBuiltCallback
 import com.nice.cxonechat.ChatBuilder.OnChatBuiltResultCallback
 import com.nice.cxonechat.ChatMode.LiveChat
 import com.nice.cxonechat.ChatMode.MultiThread
 import com.nice.cxonechat.ChatMode.SingleThread
 import com.nice.cxonechat.ChatStateListener
 import com.nice.cxonechat.ChatThreadingImpl
+import com.nice.cxonechat.exceptions.SdkVersionNotSupported
 import com.nice.cxonechat.internal.copy.ConnectionCopyable.Companion.asCopyable
+import com.nice.cxonechat.internal.model.ApiErrorModel
 import com.nice.cxonechat.internal.model.ChannelConfiguration
 import com.nice.cxonechat.internal.socket.SocketFactory
 import com.nice.cxonechat.state.Connection
+import kotlinx.serialization.json.Json
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -71,16 +73,6 @@ internal class ChatBuilderDefault(
         this.customerId = customerId
     }
 
-    @Deprecated(
-        message = "Please migrate to build method with OnChatBuildResultCallback",
-        replaceWith = ReplaceWith(
-            expression = "build(resultCallback = OnChatBuiltResultCallback { callback.onChatBuilt(it.getOrThrow()) })",
-            imports = ["com.nice.cxonechat.ChatBuilder.OnChatBuiltResultCallback"]
-        )
-    )
-    override fun build(callback: OnChatBuiltCallback): Cancellable =
-        build(resultCallback = { chatResult -> callback.onChatBuilt(chatResult.getOrThrow()) })
-
     override fun build(resultCallback: OnChatBuiltResultCallback): Cancellable {
         resultCallback.onChatBuiltResult(
             runCatching {
@@ -110,7 +102,20 @@ internal class ChatBuilderDefault(
         }
         deviceToken?.let { entrails.storage.deviceToken = it }
         val response = entrails.service.getChannel(connection.brandId.toString(), connection.channelId).execute()
-        check(response.isSuccessful) { "Response from the server was not successful" }
+        if (!response.isSuccessful) {
+            val errorBody = response.errorBody()?.string()
+            val apiError = errorBody?.let {
+                Json.decodeFromString<ApiErrorModel?>(it)
+            }
+            val errorCode = apiError?.error?.errorCode
+            if (errorCode == "SdkVersionNotSupported") {
+                throw SdkVersionNotSupported(
+                    apiError.error.errorMessage ?: "Your version of SDK is not supported anymore, please do upgrade."
+                )
+            } else {
+                error("Response from the server was not successful")
+            }
+        }
         val body = checkNotNull(response.body()) { "Response body was null" }
         val storeVisitorCallback = if (isDevelopment) StoreVisitorCallback(entrails.logger) else IgnoredCallback
         return ChatParameters(connection, factory, body, storeVisitorCallback)
@@ -133,13 +138,14 @@ internal class ChatBuilderDefault(
         chat = ChatAuthorization(chat, authorization)
         chat = ChatStoreVisitor(chat, storeVisitorCallback)
         chat = ChatWelcomeMessageUpdate(chat)
-        chat = ChatServerErrorReporting(chat)
         chat = ChatMemoizeThreadsHandler(chat)
         chat = when (chat.chatMode) {
             SingleThread -> ChatSingleThread(chat)
             MultiThread -> ChatMultiThread(chat)
             LiveChat -> ChatLiveChat(chat)
         }
+        chat = ChatServerErrorReporting(chat)
+        chat = ChatReconnectWebsocket(chat)
         chat = ChatMemoizeThreadsHandler(chat)
         chat = ChatThreadingImpl(chat)
         if (isDevelopment) chat = ChatLogging(chat)

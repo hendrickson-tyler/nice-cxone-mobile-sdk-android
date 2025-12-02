@@ -17,7 +17,6 @@ package com.nice.cxonechat.ui.composable.conversation
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.selection.selectableGroup
@@ -33,18 +32,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.nice.cxonechat.ui.composable.conversation.model.Action
 import com.nice.cxonechat.ui.composable.conversation.model.Action.ReplyButton
-import com.nice.cxonechat.ui.composable.conversation.model.PreviewMessageProvider
 import com.nice.cxonechat.ui.composable.theme.ChatTheme
 import com.nice.cxonechat.ui.composable.theme.ChatTheme.chatColors
 import com.nice.cxonechat.ui.composable.theme.LocalSpace
+import com.nice.cxonechat.ui.util.preview.message.UiSdkReplyButton
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ChipGroup(
     actions: Iterable<Action>,
     modifier: Modifier = Modifier,
     selection: Action? = null,
-    colors: ChipColors = ChipDefaults.chipColors(),
     onSelect: (Action) -> Unit = {},
 ) {
     FlowRow(
@@ -61,7 +58,6 @@ internal fun ChipGroup(
                         it.onClick()
                     },
                     enabled = selection == null,
-                    colors = colors,
                 )
             }
         }
@@ -76,23 +72,23 @@ private fun actions(count: Int = 2): List<ReplyButton> = buildList(capacity = co
     for (i in 0 until count - 1) {
         add(
             ReplyButton(
-                action = PreviewMessageProvider.ReplyButton("Chip $i"),
-                sendMessage = { }
+                action = UiSdkReplyButton("Chip $i"),
+                onActionClicked = { }
             )
         )
     }
     if (this.lastIndex % 2 == 0) {
         add(
             ReplyButton(
-                action = PreviewMessageProvider.ReplyButton("Some very very very loooooooong text, maybe too long for normal use, but you never know, right?"),
-                sendMessage = { }
+                action = UiSdkReplyButton("Some very very very loooooooong text, maybe too long for normal use, but you never know, right?"),
+                onActionClicked = { }
             )
         )
     } else {
         add(
             ReplyButton(
-                action = PreviewMessageProvider.ReplyButton("Random cat", "https://http.cat/203"),
-                sendMessage = { }
+                action = UiSdkReplyButton("Random cat", "https://http.cat/203"),
+                onActionClicked = { }
             )
         )
     }
@@ -117,7 +113,7 @@ private fun SelectableChipGroupPreview() {
                 Row {
                     Text(
                         text = "Last selected: ${(selected as? ReplyButton)?.text.orEmpty()}",
-                        color = chatColors.agent.foreground
+                        color = chatColors.token.brand.primary
                     )
                 }
             }
@@ -143,7 +139,7 @@ private fun ReusableChipGroupPreview() {
                 Row {
                     Text(
                         text = "Last selected: ${(selected as? ReplyButton)?.text.orEmpty()}",
-                        color = chatColors.agent.foreground
+                        color = chatColors.token.brand.primary
                     )
                 }
             }

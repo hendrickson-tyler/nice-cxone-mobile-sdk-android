@@ -27,7 +27,10 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
-import coil.compose.AsyncImage
+import androidx.compose.ui.platform.LocalContext
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 
 internal data class AsyncImagePainters(
     val placeholder: Painter,
@@ -49,8 +52,9 @@ internal fun asyncImagePainters(
 @Composable
 internal fun PresetAsyncImage(
     model: Any?,
-    contentDescription: String?,
     modifier: Modifier = Modifier,
+    contentDescription: String?,
+    cacheKey: String? = null,
     alignment: Alignment = Alignment.Center,
     contentScale: ContentScale = ContentScale.Fit,
     painters: AsyncImagePainters = asyncImagePainters()
@@ -69,7 +73,16 @@ internal fun PresetAsyncImage(
         colorFilter = tint
     )
     AsyncImage(
-        model = model,
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(model)
+            .crossfade(true)
+            .apply {
+                cacheKey?.let {
+                    diskCacheKey(it)
+                    memoryCacheKey(it)
+                }
+            }
+            .build(),
         contentDescription = contentDescription,
         placeholder = placeholder,
         fallback = fallback,

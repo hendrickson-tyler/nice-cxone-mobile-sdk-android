@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -61,6 +62,7 @@ import com.nice.cxonechat.sample.ui.components.ImageCarousel
 import com.nice.cxonechat.sample.ui.components.RatingBar
 import com.nice.cxonechat.sample.ui.theme.AppTheme
 import com.nice.cxonechat.sample.ui.theme.AppTheme.space
+import com.nice.cxonechat.sample.ui.theme.OutlinedButton
 import com.nice.cxonechat.sample.ui.theme.ScreenWithScaffold
 import com.nice.cxonechat.sample.viewModel.StoreViewModel
 
@@ -107,6 +109,9 @@ object ProductScreen : Screen {
                 showCart = {
                     CartScreen.ActionForCart(cart = cart, navHostController)
                 },
+                onBackClick = {
+                    navHostController.navigateUp()
+                }
             )
 
             error?.let { message ->
@@ -136,10 +141,13 @@ object ProductScreen : Screen {
             "ComposableLambdaParameterNaming" // This isn't intended to be a re-usable composable
         )
         showCart: @Composable RowScope.() -> Unit,
+        onBackClick: () -> Unit,
     ) {
         AppTheme.ScreenWithScaffold(
             title = product?.title ?: stringResource(string.unknown_product),
             actions = showCart,
+            onBackClick = onBackClick,
+            modifier = TestModifier.testTag("product_screen"),
         ) {
             product?.let { product ->
                 ProductView(product = product) {
@@ -154,16 +162,17 @@ object ProductScreen : Screen {
         AlertDialog(
             onDismissRequest = onDismiss,
             confirmButton = {
-                OutlinedButton(onClick = onRetry) {
+                OutlinedButton(onClick = onRetry, modifier = Modifier.testTag("retry_button")) {
                     Text(stringResource(string.retry))
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = onDismiss) {
+                OutlinedButton(onClick = onDismiss, modifier = Modifier.testTag("ok_button")) {
                     Text(stringResource(string.ok))
                 }
             },
             text = { Text(message) },
+            modifier = TestModifier.testTag("product_error_dialog")
         )
     }
 
@@ -174,7 +183,8 @@ object ProductScreen : Screen {
         addToCart: (Product) -> Unit
     ) {
         Column(
-            modifier = Modifier
+            modifier = TestModifier
+                .testTag("product_view")
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -200,9 +210,11 @@ object ProductScreen : Screen {
             }
             Description(product.description)
             Spacer(modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = { addToCart(product) }) {
-                Text(stringResource(string.add_to_cart))
-            }
+            AppTheme.OutlinedButton(
+                text = stringResource(string.add_to_cart),
+                modifier = Modifier.testTag("add_to_cart_button"),
+                onClick = { addToCart(product) }
+            )
         }
     }
 

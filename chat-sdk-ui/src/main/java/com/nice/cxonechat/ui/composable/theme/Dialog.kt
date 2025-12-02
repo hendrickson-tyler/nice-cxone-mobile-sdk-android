@@ -28,6 +28,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.window.DialogProperties
 import com.nice.cxonechat.ui.R
 
 @Composable
@@ -44,14 +45,17 @@ internal fun ChatTheme.Dialog(
         onDismissRequest = onDismiss,
         confirmButton = confirmButton,
         modifier = modifier,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
         dismissButton = dismissButton,
+        containerColor = chatColors.token.background.surface.subtle,
         text = {
             Column {
                 title?.let {
                     Text(
                         it,
                         modifier = Modifier.padding(bottom = titlePadding),
-                        style = chatTypography.dialogTitle
+                        style = chatTypography.dialogTitle,
+                        color = colorScheme.onSurface
                     )
                 }
                 content()

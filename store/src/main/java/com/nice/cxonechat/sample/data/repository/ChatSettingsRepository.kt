@@ -16,8 +16,8 @@
 package com.nice.cxonechat.sample.data.repository
 
 import android.content.Context
-import androidx.annotation.Keep
 import com.nice.cxonechat.sample.data.models.ChatSettings
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.koin.core.annotation.Single
@@ -26,13 +26,16 @@ import org.koin.core.annotation.Single
  * Repository responsible saving, loading, and tracking chat related settings.
  *
  * @param context Application context for file access.
+ * @param applicationScope CoroutineScope for file access.
  */
 @Single
 class ChatSettingsRepository(
     val context: Context,
+    applicationScope: CoroutineScope,
 ) : FileRepository<ChatSettings>(
     fileName = "settings.json",
     type = ChatSettings::class,
+    applicationScope,
 ) {
     private val mutableSettings = MutableStateFlow<ChatSettings?>(null)
 
@@ -44,8 +47,7 @@ class ChatSettingsRepository(
      *
      * @return newly loaded settings.
      */
-    @Keep // Remove once the  DE-117407 is resolved
-    fun load() = super.load(context).also {
+    suspend fun load() = super.load(context).also {
         mutableSettings.value = it
     }
 

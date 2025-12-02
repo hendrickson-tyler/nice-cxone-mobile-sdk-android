@@ -16,13 +16,25 @@
 package com.nice.cxonechat.sample.ui
 
 import android.content.Context
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement.SpaceBetween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,10 +42,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import com.nice.cxonechat.enums.CXOneEnvironment
+import com.nice.cxonechat.enums.CXoneEnvironment
 import com.nice.cxonechat.sample.R.string
 import com.nice.cxonechat.sample.data.models.SdkConfiguration
 import com.nice.cxonechat.sample.data.models.SdkConfigurations
@@ -41,69 +55,128 @@ import com.nice.cxonechat.sample.data.models.asSdkEnvironment
 import com.nice.cxonechat.sample.data.repository.SdkConfigurationListRepository
 import com.nice.cxonechat.sample.ui.components.DropdownField
 import com.nice.cxonechat.sample.ui.components.DropdownItem
+import com.nice.cxonechat.sample.ui.components.extraCustomFields
 import com.nice.cxonechat.sample.ui.theme.AppTheme
 import com.nice.cxonechat.sample.ui.theme.AppTheme.space
-import com.nice.cxonechat.sample.ui.theme.Dialog
-import com.nice.cxonechat.sample.ui.theme.OutlinedButton
 import com.nice.cxonechat.sample.ui.theme.TextField
 import com.nice.cxonechat.sample.utilities.Requirements.allOf
 import com.nice.cxonechat.sample.utilities.Requirements.integer
 import com.nice.cxonechat.sample.utilities.Requirements.required
+import com.nice.cxonechat.sample.viewModel.ExtraCustomFieldsViewModel
 import kotlinx.coroutines.runBlocking
+import org.koin.androidx.compose.koinViewModel
 
 /**
  * Composable dialog to allow an SDK configuration to be picked from a predefined
  * list or defined from it's component elements.
  *
  * @param configuration Current configuration, if any.
- * @param configurations List of predefined configurations available.
+ * @param configurationDefinitions List of predefined configurations available.
+ * @param extraCustomFieldModel ViewModel to manage extra custom fields.
  * @param onDismiss Function to dismiss the dialog, if it's allowed.
  * @param onConfigurationSelected Callback when the user accepts a configuration.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SdkConfigurationDialog(
     configuration: SdkConfiguration?,
-    configurations: SdkConfigurations,
+    configurationDefinitions: SdkConfigurations,
+    extraCustomFieldModel: ExtraCustomFieldsViewModel = koinViewModel(),
     onDismiss: () -> Unit,
     onConfigurationSelected: (SdkConfiguration) -> Unit,
 ) {
     val context = LocalContext.current
-    val state = remember { SdkConfigurationState(context, configuration, configurations) }
+    val state = remember { SdkConfigurationState(context, configuration, configurationDefinitions) }
     val builtConfiguration = if (state.validate()) {
         state.build()
     } else {
         null
     }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    AppTheme.Dialog(
-        modifier = Modifier.wrapContentHeight(),
-        onDismiss = if (state.configuration != null) {
-            onDismiss
-        } else {
-            {}
-        },
-        title = stringResource(string.sdk_configuration),
-        confirmButton = {
-            AppTheme.OutlinedButton(
-                text = stringResource(string.continue_button),
-                enabled = builtConfiguration != null
-            ) {
-                builtConfiguration?.let(onConfigurationSelected)
-            }
-        },
-        dismissButton = {
-            if(state.configuration != null) {
-                AppTheme.OutlinedButton(text = stringResource(string.cancel), onClick = onDismiss)
-            }
-        },
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        modifier = TestModifier.testTag("sdk_configuration_dialog"),
+        sheetState = sheetState
     ) {
-        Column {
+        Column(modifier = Modifier.padding(24.dp)) {
+            Text(
+                text = stringResource(id = string.sdk_configuration),
+                style = AppTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = space.small)
+            )
+            DialogBody(
+                state = state,
+                extraCustomFieldModel = extraCustomFieldModel,
+                builtConfiguration = builtConfiguration,
+                onConfigurationSelected = onConfigurationSelected,
+                onDismiss = onDismiss
+                )
+           }
+    }
+}
+
+@Composable
+private fun DialogBody(
+    state: SdkConfigurationState,
+    extraCustomFieldModel: ExtraCustomFieldsViewModel,
+    builtConfiguration: SdkConfiguration?,
+    onConfigurationSelected: (SdkConfiguration) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val extraCustomerFields by extraCustomFieldModel.extraCustomerFieldsFlow.collectAsState()
+    val extraContactFields by extraCustomFieldModel.extraContactFieldsFlow.collectAsState()
+    LazyColumn {
+        item {
             ConfigurationSelector(
                 state = state,
                 modifier = Modifier.padding(top = 16.dp),
             )
-
+        }
+        item {
             CustomEnvironmentDetails(state = state)
+        }
+        extraCustomFields(
+            label = string.extra_customer_fields,
+            customFields = extraCustomerFields,
+            onSet = extraCustomFieldModel::setCustomerCustomField,
+            onRemove = extraCustomFieldModel::removeCustomerCustomField
+        )
+        extraCustomFields(
+            label = string.extra_contact_fields,
+            customFields = extraContactFields,
+            onSet = extraCustomFieldModel::setContactCustomField,
+            onRemove = extraCustomFieldModel::removeContactCustomField
+        )
+
+        item {
+            Row(
+                horizontalArrangement = SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (state.configuration != null) {
+                    TextButton(
+                        modifier = Modifier.testTag("sdk_configuration_bottomsheet_cancel_button"),
+                        onClick = {
+                            onDismiss()
+                        }
+                    ) {
+                        Text(text = stringResource(string.cancel))
+                    }
+                }
+                TextButton(
+                    modifier = Modifier.testTag("sdk_configuration_bottomsheet_continue_button"),
+                    onClick = {
+                        builtConfiguration?.let {
+                            extraCustomFieldModel.save()
+                            onConfigurationSelected(it)
+                        }
+                    },
+                    enabled = builtConfiguration != null
+                ) {
+                    Text(text = stringResource(string.continue_button))
+                }
+            }
         }
     }
 }
@@ -116,7 +189,7 @@ private class SdkConfigurationState(
     val customConfigurationName = context.getString(string.custom)
     var configurationName by mutableStateOf(configuration?.name ?: customConfigurationName)
         private set
-    val environments = CXOneEnvironment.values()
+    val environments = CXoneEnvironment.entries.toTypedArray()
     var environment by mutableStateOf(configuration?.environment?.name ?: "")
     var brandId by mutableStateOf(configuration?.brandId?.toString() ?: "")
     var channelId by mutableStateOf(configuration?.channelId ?: "")
@@ -175,13 +248,14 @@ private fun ConfigurationSelector(
     val choices: Sequence<DropdownItem<String>> =
         (state.configurations.map { DropdownItem(it.name) } + DropdownItem(context.getString(string.custom)))
             .asSequence()
-
-    Column(
+    Box(
         modifier
-            .border(1.dp, AppTheme.colorScheme.onBackground.copy(alpha = 0.50f), RoundedCornerShape(4.dp))
+            .border(1.dp, AppTheme.colorScheme.outline, RoundedCornerShape(4.dp))
     ) {
         DropdownField(
-            modifier = Modifier.padding(space.defaultPadding),
+            modifier = Modifier
+                .padding(space.defaultPadding)
+                .testTag("configuration_selector"),
             label = stringResource(string.configuration),
             value = state.configurationName,
             options = choices,
@@ -191,12 +265,14 @@ private fun ConfigurationSelector(
 }
 
 @Composable
-private fun CustomEnvironmentDetails(state: SdkConfigurationState) {
-    if(state.isCustomConfiguration) {
-        HorizontalDivider(modifier = Modifier.padding(vertical = space.medium))
-        EnvironmentSelector(state)
-        BrandIdField(state)
-        ChannelIdField(state)
+private fun LazyItemScope.CustomEnvironmentDetails(state: SdkConfigurationState) {
+    AnimatedVisibility(state.isCustomConfiguration, Modifier.animateItem()) {
+        Column {
+            HorizontalDivider(modifier = Modifier.padding(vertical = space.medium))
+            EnvironmentSelector(state)
+            BrandIdField(state)
+            ChannelIdField(state)
+        }
     }
 }
 
@@ -208,10 +284,13 @@ private fun EnvironmentSelector(
     Column(
         modifier
             .padding(top = space.medium)
-            .border(1.dp, AppTheme.colorScheme.onBackground.copy(alpha = 0.50f), RoundedCornerShape(4.dp))
+            .border(1.dp, AppTheme.colorScheme.outline, RoundedCornerShape(4.dp))
     ) {
         DropdownField(
-            modifier = modifier.padding(space.defaultPadding),
+            modifier = Modifier
+                .testTag("environment_selector")
+                .then(modifier)
+                .padding(space.defaultPadding),
             label = stringResource(string.environment),
             value = state.environment,
             options = state.environments.map { DropdownItem(it.name) }.asSequence(),
@@ -227,6 +306,7 @@ private fun BrandIdField(state: SdkConfigurationState) {
         label = stringResource(string.brand_id),
         value = state.brandId,
         requirement = allOf(required, integer),
+        modifier = Modifier.testTag("brand_id_field"),
     ) {
         state.brandId = it
     }
@@ -238,12 +318,13 @@ private fun ChannelIdField(state: SdkConfigurationState) {
         label = stringResource(string.channel_id),
         value = state.channelId,
         requirement = allOf(required),
+        modifier = Modifier.testTag("channel_id_field"),
     ) {
         state.channelId = it
     }
 }
 
-@Preview(showBackground = true)
+@PreviewLightDark
 @Composable
 private fun PreviewWithCustom() {
     val context = LocalContext.current
@@ -252,7 +333,7 @@ private fun PreviewWithCustom() {
     AppTheme {
         SdkConfigurationDialog(
             null,
-            configurations = configurations,
+            configurationDefinitions = configurations,
             onDismiss = {},
             onConfigurationSelected = {}
         )
@@ -268,7 +349,7 @@ private fun PreviewWithSelection() {
     AppTheme {
         SdkConfigurationDialog(
             configurations.first(),
-            configurations = configurations,
+            configurationDefinitions = configurations,
             onDismiss = {},
             onConfigurationSelected = {}
         )

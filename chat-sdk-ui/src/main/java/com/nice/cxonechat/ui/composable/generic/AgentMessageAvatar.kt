@@ -26,8 +26,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.Icons.Rounded
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -36,49 +36,56 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.nice.cxonechat.ui.composable.theme.ChatTheme
-import com.nice.cxonechat.ui.model.Person
+import com.nice.cxonechat.ui.domain.model.Person
 
 @Composable
-internal fun MessageAvatar(agent: Person, modifier: Modifier = Modifier) {
-    val foreground = ChatTheme.chatColors.agentAvatar.foreground
+internal fun MessageAvatar(agent: Person?, modifier: Modifier = Modifier) {
+    val foreground = ChatTheme.chatColors.token.brand.onPrimaryContainer
     val placeholder = forwardingPainter(
-        painter = rememberVectorPainter(image = Icons.Outlined.AccountCircle),
+        painter = rememberVectorPainter(image = Rounded.Person),
         colorFilter = ColorFilter.tint(foreground)
     )
-    val monogram = agent.monogram
+    val monogram = agent?.monogram
 
     Box(
         modifier = modifier
             .size(ChatTheme.space.messageAvatarSize)
             .clip(CircleShape)
-            .background(ChatTheme.chatColors.agentAvatar.background)
+            .background(ChatTheme.chatColors.token.brand.primaryContainer)
             .padding(0.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (monogram != null) {
-            Text(
-                monogram,
-                color = foreground,
-                style = ChatTheme.chatTypography.messageAvatarText,
-            )
-        } else {
-            Image(
-                placeholder,
-                null,
-                modifier = Modifier.fillMaxSize().padding(0.dp),
-                contentScale = ContentScale.Fit,
-            )
+        when {
+            agent?.imageUrl != null ->
+                AsyncImage(
+                    model = agent.imageUrl,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("avatarImage"),
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit
+                )
+            monogram != null ->
+                Text(
+                    text = monogram,
+                    color = foreground,
+                    style = ChatTheme.chatTypography.messageAvatarText,
+                )
+            else ->
+                Image(
+                    painter = placeholder,
+                    contentDescription = "avatarPlaceholder",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(6.dp),
+                    contentScale = ContentScale.Fit,
+                )
         }
-        AsyncImage(
-            model = agent.imageUrl,
-            modifier = Modifier.fillMaxSize(),
-            contentDescription = null,
-            contentScale = ContentScale.Fit
-        )
     }
 }
 

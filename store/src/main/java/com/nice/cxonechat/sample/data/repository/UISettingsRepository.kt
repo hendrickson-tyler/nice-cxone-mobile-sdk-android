@@ -16,12 +16,8 @@
 package com.nice.cxonechat.sample.data.repository
 
 import android.content.Context
-import androidx.annotation.Keep
 import com.nice.cxonechat.sample.data.models.UISettingsModel
-import com.nice.cxonechat.sample.data.models.UISettingsModel.Colors
 import com.nice.cxonechat.ui.composable.theme.ChatThemeDetails
-import com.nice.cxonechat.ui.composable.theme.Images
-import com.nice.cxonechat.ui.composable.theme.ThemeColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,33 +36,17 @@ val UISettings: StateFlow<UISettingsModel> = UISettingsState.asStateFlow()
  * Repository to save and restore UI settings to a json file.
  *
  * @param context Application context for file access.
+ * @param applicationScope CoroutineScope for file access.
  */
 @Single
 class UISettingsRepository(
     val context: Context,
+    applicationScope: CoroutineScope,
 ) : FileRepository<UISettingsModel>(
     fileName = "UISettings.json",
-    type = UISettingsModel::class
+    type = UISettingsModel::class,
+    applicationScope
 ) {
-    private val Colors.asChatThemeColors: ThemeColors
-        get() = ThemeColors(
-            primary = primary,
-            onPrimary = onPrimary,
-            background = background,
-            onBackground = onBackground,
-            surfaceContainer = surfaceContainer,
-            surfaceVariant = surfaceVariant,
-            onSurfaceHigh = surfaceContainerHigh,
-            onSurfaceHighest = surfaceContainerHighest,
-            accent = accent,
-            onAccent = onAccent,
-            agentBackground = agentBackground,
-            agentText = agentText,
-            agentAvatarForeground = agentAvatarForeground,
-            agentAvatarBackground = agentAvatarBackground,
-            customerBackground = customerBackground,
-            customerText = customerText,
-        )
 
     /**
      * Update the saved UI Settings.
@@ -83,8 +63,7 @@ class UISettingsRepository(
      * Load any available saved UI Settings.  Default settings will be applied if no saved
      * settings are located.
      */
-    @Keep // Remove once the  DE-117407 is resolved
-    fun load() = super.load(context).also {
+    suspend fun load() = super.load(context).also {
         UISettingsState.value = (it ?: UISettingsModel()).apply {
             applyToChatSdk()
         }
@@ -101,8 +80,7 @@ class UISettingsRepository(
     }
 
     private fun UISettingsModel.applyToChatSdk() {
-        ChatThemeDetails.darkColors = darkModeColors.asChatThemeColors
-        ChatThemeDetails.lightColors = lightModeColors.asChatThemeColors
-        ChatThemeDetails.images = Images(logo)
+        ChatThemeDetails.darkTokens = darkModeColors
+        ChatThemeDetails.lightTokens = lightModeColors
     }
 }

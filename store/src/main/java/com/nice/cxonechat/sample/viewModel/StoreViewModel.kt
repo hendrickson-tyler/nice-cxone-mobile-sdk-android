@@ -19,6 +19,7 @@ import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.Stable
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.nice.cxonechat.ChatInstanceProvider
 import com.nice.cxonechat.ChatState
 import com.nice.cxonechat.exceptions.RuntimeChatException
@@ -27,10 +28,10 @@ import com.nice.cxonechat.log.LoggerScope
 import com.nice.cxonechat.log.debug
 import com.nice.cxonechat.log.error
 import com.nice.cxonechat.log.scope
-import com.nice.cxonechat.log.warning
 import com.nice.cxonechat.sample.data.models.ChatSettings
 import com.nice.cxonechat.sample.data.models.LoginData
 import com.nice.cxonechat.sample.data.repository.ChatSettingsRepository
+import com.nice.cxonechat.sample.data.repository.ExtraCustomFieldRepository
 import com.nice.cxonechat.sample.data.repository.SdkConfigurationListRepository
 import com.nice.cxonechat.sample.data.repository.StoreRepository
 import com.nice.cxonechat.sample.data.repository.UISettingsRepository
@@ -41,9 +42,12 @@ import com.nice.cxonechat.sample.viewModel.UiState.Login
 import com.nice.cxonechat.sample.viewModel.UiState.OAuth
 import com.nice.cxonechat.sample.viewModel.UiState.Prepared
 import com.nice.cxonechat.sample.viewModel.UiState.Preparing
+import com.nice.cxonechat.sample.viewModel.UiState.SdkNotSupported
 import com.nice.cxonechat.sample.viewModel.UiState.UiSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import org.koin.android.annotation.KoinViewModel
 
 /**
@@ -54,20 +58,30 @@ import org.koin.android.annotation.KoinViewModel
 @KoinViewModel
 class StoreViewModel(
     application: Application,
-    /** store repository containing cart and product information. */
-    val storeRepository: StoreRepository,
-    /** sdk configuration repository containing list of predefined SDK configurations. */
-    val sdkConfigurationListRepository: SdkConfigurationListRepository,
-    /** chat configuration and settings repository containing the current configuration. */
-    val chatSettingsRepository: ChatSettingsRepository,
-    /** UI settings repository saving and managing UI configuration. */
-    val uiSettingsRepository: UISettingsRepository,
+    lazyStoreRepository: Lazy<StoreRepository>,
+    lazySdkConfigurationListRepository: Lazy<SdkConfigurationListRepository>,
+    lazyChatSettingsRepository: Lazy<ChatSettingsRepository>,
+    lazyUiSettingsRepository: Lazy<UISettingsRepository>,
+    /** Persistence for extra custom fields. */
+    private val extraCustomFieldRepository: ExtraCustomFieldRepository,
     /** chat repository containing current chat. */
     val chatProvider: ChatInstanceProvider,
     /** logger for store messages. */
     logger: Logger,
 ) : AndroidViewModel(application), LoggerScope by LoggerScope(TAG, logger) {
     private val uiStateStore = MutableStateFlow<UiState>(Initial)
+
+    /** chat configuration and settings repository containing the current configuration. */
+    val chatSettingsRepository: ChatSettingsRepository by lazyChatSettingsRepository
+
+    /** UI settings repository saving and managing UI configuration. */
+    val uiSettingsRepository: UISettingsRepository by lazyUiSettingsRepository
+
+    /** store repository containing cart and product information. */
+    val storeRepository: StoreRepository by lazyStoreRepository
+
+    /** sdk configuration repository containing list of predefined SDK configurations. */
+    val sdkConfigurationListRepository: SdkConfigurationListRepository by lazySdkConfigurationListRepository
 
     private val context
         get() = getApplication() as Context
@@ -86,9 +100,16 @@ class StoreViewModel(
     private val listener = Listener().also(chatProvider::addListener)
 
     init {
-        chatSettingsRepository.load()
-        uiSettingsRepository.load()
-        sdkConfigurationListRepository.load()
+        viewModelScope.launch(Dispatchers.IO) {
+            val chatSettings = chatSettingsRepository.load()
+            if (chatSettings == null) {
+                setUiState(Configuration)
+            } else {
+                chatProvider.prepare(context, chatSettings.sdkConfiguration?.asSocketFactoryConfiguration)
+            }
+            uiSettingsRepository.load()
+            sdkConfigurationListRepository.load()
+        }
     }
 
     override fun onCleared() {
@@ -111,24 +132,18 @@ class StoreViewModel(
      */
     private fun startChat() {
         listener.onChatStateChanged(chatProvider.chatState)
-
-        if (chatSettingsRepository.settings.value == null) {
-            setUiState(Configuration(this))
-        } else if (uiState.value is Configuration) {
-            chatProvider.prepare(context)
-        }
     }
 
     /**
      * present SDK configuration alert.
      */
     fun presentConfigurationDialog() {
-        setUiState(Configuration(this))
+        setUiState(Configuration)
     }
 
     /** Display the UI Settings dialog. */
     fun presentUiSettings() {
-        setUiState(UiSettings(this))
+        setUiState(UiSettings)
     }
 
     /**
@@ -180,7 +195,7 @@ class StoreViewModel(
         false -> if (settings?.userName != null) {
             Prepared
         } else {
-            Login(this)
+            Login
         }
     }
 
@@ -194,7 +209,7 @@ class StoreViewModel(
      */
     fun logout() {
         chatSettingsHandler.clearAuthentication()
-
+        extraCustomFieldRepository.clear(context)
         // This needs to be *after* all the settings are cleared out or we
         // immediately reconnect using the same information.
         chatProvider.signOut()
@@ -215,15 +230,16 @@ class StoreViewModel(
         override fun onChatStateChanged(chatState: ChatState) {
             // If the chat has now connected, see if we need to send authorization
             when (chatState) {
-                ChatState.Initial -> setUiState(Configuration(this@StoreViewModel))
-                ChatState.Preparing -> setUiState(Preparing(this@StoreViewModel))
+                ChatState.Initial -> setUiState(Configuration)
+                ChatState.Preparing -> setUiState(Preparing)
                 ChatState.Prepared -> onConnected()
+                ChatState.SdkNotSupported -> setUiState(SdkNotSupported)
                 else -> Ignored
             }
         }
 
         override fun onChatRuntimeException(exception: RuntimeChatException) = scope("onChatRuntimeException") {
-            warning("Chat SDK reported exception.", exception)
+            error("Chat SDK reported exception.", exception)
         }
     }
 

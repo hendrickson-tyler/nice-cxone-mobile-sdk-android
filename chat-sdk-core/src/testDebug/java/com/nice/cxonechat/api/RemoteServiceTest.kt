@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024. NICE Ltd. All rights reserved.
+ * Copyright (c) 2021-2025. NICE Ltd. All rights reserved.
  *
  * Licensed under the NICE License;
  * you may not use this file except in compliance with the License.
@@ -139,7 +139,6 @@ internal class RemoteServiceTest {
         ).execute()
 
         assertEquals(1, recorder.requests.count())
-        val dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS'z'"
 
         with(recorder.requests.first()) {
             assertEquals("POST", method)

@@ -17,24 +17,22 @@ package com.nice.cxonechat
 
 import androidx.annotation.CallSuper
 import com.nice.cxonechat.api.RemoteService
-import com.nice.cxonechat.enums.CXOneEnvironment
+import com.nice.cxonechat.enums.CXoneEnvironment
 import com.nice.cxonechat.internal.ChatEntrails
 import com.nice.cxonechat.internal.model.AvailabilityStatus.Online
 import com.nice.cxonechat.internal.model.ChannelAvailability
 import com.nice.cxonechat.internal.model.ChannelConfiguration
 import com.nice.cxonechat.internal.model.ChannelConfiguration.FileRestrictions
 import com.nice.cxonechat.internal.socket.ProxyWebSocketListener
-import com.nice.cxonechat.log.Level
-import com.nice.cxonechat.log.Logger
 import com.nice.cxonechat.storage.ValueStorage
 import com.nice.cxonechat.tool.ChatEntrailsMock
+import com.nice.cxonechat.tool.MockLogger
 import com.nice.cxonechat.tool.MockServer
 import com.nice.cxonechat.tool.awaitResult
 import com.nice.cxonechat.util.plus
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.spyk
 import io.mockk.verify
 import okhttp3.OkHttpClient
 import okhttp3.WebSocket
@@ -75,8 +73,6 @@ internal abstract class AbstractChatTestSubstrate {
             ),
             isAuthorizationEnabled = true,
             preContactForm = null,
-            customerCustomFields = listOf(),
-            contactCustomFields = listOf(),
             isLiveChat = isLiveChat,
             availability = mockk {
                 every { status } answers { chatAvailability }
@@ -92,20 +88,14 @@ internal abstract class AbstractChatTestSubstrate {
         proxyListener = socketServer.proxyListener
         storage = mockStorage()
         service = mockService()
-        entrails = ChatEntrailsMock(httpClient, storage, service, mockLogger(), CXOneEnvironment.EU1.value)
+        entrails = ChatEntrailsMock(httpClient, storage, service, mockLogger(), CXoneEnvironment.EU1.value)
         prepare()
     }
 
     @CallSuper
     protected abstract fun prepare()
 
-    protected fun mockLogger() = object : Logger {
-        override fun log(level: Level, message: String, throwable: Throwable?) {
-            @Suppress("ProhibitedCall")
-            println(message)
-            throwable?.printStackTrace()
-        }
-    }.let(::spyk)
+    protected fun mockLogger() = MockLogger()
 
     // relaxUnitFun = true means we don't need to mock all the setters.
     private fun mockStorage(): ValueStorage = mockk(relaxUnitFun = true) {
@@ -143,8 +133,8 @@ internal abstract class AbstractChatTestSubstrate {
     protected inline fun <T> testCallback(
         body: (trigger: (T) -> Unit) -> Any,
         serverAction: MockServer.() -> Unit,
-    ): T = awaitResult(100.milliseconds) {
-        body(it).also {
+    ): T = awaitResult(100.milliseconds) { callback: (T) -> Unit ->
+        body(callback).also {
             socketServer.serverAction()
         }
     }

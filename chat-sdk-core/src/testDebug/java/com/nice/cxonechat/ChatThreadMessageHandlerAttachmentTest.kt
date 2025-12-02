@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024. NICE Ltd. All rights reserved.
+ * Copyright (c) 2021-2025. NICE Ltd. All rights reserved.
  *
  * Licensed under the NICE License;
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,6 @@ import retrofit2.Call
 import retrofit2.Response
 import java.io.IOException
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -69,8 +68,6 @@ internal class ChatThreadMessageHandlerAttachmentTest : AbstractChatTest() {
             ),
             isAuthorizationEnabled = true,
             preContactForm = null,
-            customerCustomFields = listOf(),
-            contactCustomFields = listOf(),
             isLiveChat = isLiveChat,
             availability = mockk {
                 every { status } answers { chatAvailability }
@@ -83,7 +80,6 @@ internal class ChatThreadMessageHandlerAttachmentTest : AbstractChatTest() {
         messages = chat.threads().thread(thread).messages()
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun send_attachments_sendsExpectedMessage() {
         val bytes = Random.nextBytes(32)
@@ -136,7 +132,6 @@ internal class ChatThreadMessageHandlerAttachmentTest : AbstractChatTest() {
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun send_attachment_notifies_about_failure_in_response() {
         val expected = nextString(8)
@@ -176,7 +171,6 @@ internal class ChatThreadMessageHandlerAttachmentTest : AbstractChatTest() {
         )
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     @Test
     fun send_attachment_notifies_about_failure_in_network_call() {
         val expected = nextString(length = 8)
@@ -245,7 +239,6 @@ internal class ChatThreadMessageHandlerAttachmentTest : AbstractChatTest() {
         every { MimeTypeMap.getSingleton() } returns it
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun mockAndroidBase64() {
         // since android.* classes aren't implemented for unit tests, mock out Base64 conversion
         // to just return a fixed string

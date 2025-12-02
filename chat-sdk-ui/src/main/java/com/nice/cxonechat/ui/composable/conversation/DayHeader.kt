@@ -31,7 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.nice.cxonechat.ui.composable.theme.ChatTheme
-import com.nice.cxonechat.ui.tooling.preview.MultiLocalePreview
+import com.nice.cxonechat.ui.util.preview.MultiLocalePreview
 import com.nice.cxonechat.ui.util.toShortDateString
 import java.util.Calendar
 
@@ -46,7 +46,7 @@ internal fun MessageGroupHeader(dayString: String, modifier: Modifier = Modifier
             text = dayString,
             modifier = Modifier.padding(horizontal = ChatTheme.space.large),
             style = ChatTheme.chatTypography.chatDayHeader,
-            color = ChatTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+            color = ChatTheme.colorScheme.tertiary
         )
         DayHeaderLine()
     }

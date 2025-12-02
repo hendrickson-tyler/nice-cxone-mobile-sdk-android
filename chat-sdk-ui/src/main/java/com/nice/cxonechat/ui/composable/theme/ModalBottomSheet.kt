@@ -15,9 +15,7 @@
 
 package com.nice.cxonechat.ui.composable.theme
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Arrangement.SpaceBetween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -60,7 +59,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.material3.ModalBottomSheet as Material3ModalBottomSheet
 
 /**
- * A modal bottom sheet with a title, content, and two buttons at the bottom, one for cancel and one for submit.
+ * A modal bottom sheet with a title, subtitle, content, and two buttons at the bottom, one for cancel and one for submit.
  * Both buttons will hide the sheet when clicked, since the sheet is modal it should be removed from the hierarchy
  * if it is no longer needed, otherwise it will block any other non-modal UI from being interacted with.
  *
@@ -68,7 +67,8 @@ import androidx.compose.material3.ModalBottomSheet as Material3ModalBottomSheet
  * @param onSubmit callback when the submit button is clicked.
  * @param canSubmit whether the submit button should be in a enabled state.
  * @param modifier modifier for the sheet.
- * @param title title of the sheet.
+ * @param title Optional title of the sheet.
+ * @param subtitle Optional subtitle of the sheet.
  * @param sheetGestureEnabled whether the sheet should be dismissible by dragging.
  * @param sheetState state of the sheet, which can be used to reset the sheet to the expanded state.
  * @param dragHandle drag handle for the sheet.
@@ -82,9 +82,10 @@ internal fun ChatTheme.ModalBottomSheet(
     canSubmit: Boolean,
     modifier: Modifier = Modifier,
     title: String? = null,
+    subtitle: String? = null,
     sheetGestureEnabled: Boolean = false,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-    dragHandle: @Composable () -> Unit = { BottomSheetDefaults.DragHandle(color = colorScheme.surfaceDim) },
+    dragHandle: @Composable () -> Unit = { BottomSheetDefaults.DragHandle(color = chatColors.token.content.tertiary) },
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -94,8 +95,8 @@ internal fun ChatTheme.ModalBottomSheet(
     Material3ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetGesturesEnabled = sheetGestureEnabled,
-        containerColor = colorScheme.background,
-        contentColor = colorScheme.onBackground,
+        containerColor = chatColors.token.background.surface.subtle,
+        contentColor = chatColors.token.content.primary,
         dragHandle = dragHandle,
         sheetState = sheetState,
         modifier = modifier,
@@ -105,43 +106,100 @@ internal fun ChatTheme.ModalBottomSheet(
         ) {
             // By using the dynamic height of the footer, we can adjust the padding of the content to get the sticky footer.
             var footerHeight: Int by remember { mutableIntStateOf(0) }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = space.xl,
-                        end = space.xl,
-                        bottom = with(LocalDensity.current) { footerHeight.toDp() }
-                    ),
-            ) {
-                title?.let {
-                    Text(
-                        it,
-                        modifier = Modifier.padding(bottom = 41.dp),
-                        style = chatTypography.surveyTitle
-                    )
-                }
-                content()
-            }
 
-            val bottomRowBackground = colorScheme.onBackground.copy(alpha = 0.05f)
+            // Body is extracted to a helper to reduce function size
+            ModalBottomSheetBody(title = title, subtitle = subtitle, footerHeight = footerHeight, content = content)
+
+            val bottomRowBackground = colorScheme.background
             NavigationBarOverlay(bottomRowBackground)
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(bottomRowBackground)
-                    .onGloballyPositioned { layoutCoordinates ->
-                        footerHeight = layoutCoordinates.size.height
-                    }
-            ) {
-                TextButton(onClick = { hideSheet(onDismiss) }) {
-                    Text(stringResource(string.cancel))
-                }
-                TextButton(onClick = { hideSheet(onSubmit) }, enabled = canSubmit) {
-                    Text(stringResource(string.done))
-                }
+
+            // Footer extracted to helper
+            ModalBottomSheetFooter(
+                bottomRowBackground = bottomRowBackground,
+                footerHeightProvider = { h -> footerHeight = h },
+                onCancel = { hideSheet(onDismiss) },
+                onSubmit = { hideSheet(onSubmit) },
+                canSubmit = canSubmit
+            )
+        }
+    }
+}
+
+// New helper composable for the body/content area
+@Composable
+private fun ChatTheme.ModalBottomSheetBody(
+    title: String?,
+    subtitle: String?,
+    footerHeight: Int,
+    content: @Composable () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                top = space.xl,
+                start = space.xl,
+                end = space.xl,
+                bottom = with(LocalDensity.current) { footerHeight.toDp() }
+            ),
+    ) {
+        title?.let {
+            Text(
+                it,
+                modifier = Modifier.padding(bottom = subtitle?.let { 4.dp } ?: 16.dp),
+                style = chatTypography.surveyTitle
+            )
+        }
+        subtitle?.let {
+            Text(
+                it,
+                modifier = Modifier.padding(bottom = 16.dp),
+                style = chatTypography.surveySubtitle,
+                color = chatColors.token.content.secondary
+            )
+        }
+        content()
+    }
+}
+
+// New helper composable for the footer row
+@Composable
+private fun ChatTheme.ModalBottomSheetFooter(
+    bottomRowBackground: Color,
+    footerHeightProvider: (Int) -> Unit,
+    onCancel: () -> Unit,
+    onSubmit: () -> Unit,
+    canSubmit: Boolean,
+) {
+    Row(
+        horizontalArrangement = SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(bottomRowBackground)
+            .onGloballyPositioned { layoutCoordinates ->
+                footerHeightProvider(layoutCoordinates.size.height)
             }
+            .padding(top = 3.dp, start = 2.dp, end = 2.dp)
+    ) {
+        TextButton(
+            modifier = Modifier.testTag("cancel_button"),
+            onClick = onCancel
+        ) {
+            Text(
+                modifier = Modifier,
+                text = stringResource(string.cancel),
+                style = chatTypography.bottomSheetFooterButtonText
+            )
+        }
+        TextButton(
+            modifier = Modifier.testTag("submit_button"),
+            onClick = onSubmit,
+            enabled = canSubmit
+        ) {
+            Text(
+                text = stringResource(string.done),
+                style = chatTypography.bottomSheetFooterButtonText
+            )
         }
     }
 }
@@ -163,7 +221,7 @@ private fun ChatTheme.NavigationBarOverlay(bottomRowBackground: Color) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Preview(showSystemUi = true, showBackground = true)
 @Composable
 private fun ModalBottomSheetPreview() {
@@ -176,6 +234,29 @@ private fun ModalBottomSheetPreview() {
         )
     }
     var canSubmit by remember { mutableStateOf(false) }
+    val previewContent: @Composable () -> Unit = {
+        LazyColumn(
+            contentPadding = PaddingValues(vertical = space.medium),
+        ) {
+            stickyHeader {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = SpaceBetween
+                ) {
+                    Text("Enable submit button")
+                    Switch(canSubmit, onCheckedChange = { canSubmit = it })
+                }
+            }
+            items(25) {
+                ChatTheme.TextField(
+                    label = "Label $it",
+                    value = rememberTextFieldState("$it"),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
     ChatTheme {
         val scope = rememberCoroutineScope()
         Column {
@@ -192,30 +273,9 @@ private fun ModalBottomSheetPreview() {
                     onDismiss = {},
                     onSubmit = {},
                     title = "Title",
+                    subtitle = "Subtitle",
                     sheetState = previewSheetState,
-                    content = {
-                        LazyColumn(
-                            contentPadding = PaddingValues(vertical = space.medium),
-                        ) {
-                            stickyHeader {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = SpaceBetween
-                                ) {
-                                    Text("Enable submit button")
-                                    Switch(canSubmit, onCheckedChange = { canSubmit = it })
-                                }
-                            }
-                            items(25) {
-                                ChatTheme.TextField(
-                                    label = "Label $it",
-                                    value = rememberTextFieldState("$it"),
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
-                    },
+                    content = previewContent,
                     canSubmit = canSubmit
                 )
             }

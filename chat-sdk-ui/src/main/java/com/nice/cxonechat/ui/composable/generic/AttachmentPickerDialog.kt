@@ -16,136 +16,197 @@
 package com.nice.cxonechat.ui.composable.generic
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize.Max
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowRight
+import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.tooling.preview.Preview
-import com.nice.cxonechat.ui.R
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.nice.cxonechat.ui.AttachmentType
 import com.nice.cxonechat.ui.R.string
+import com.nice.cxonechat.ui.composable.icons.ChatIcons
+import com.nice.cxonechat.ui.composable.icons.outlined.Camera
+import com.nice.cxonechat.ui.composable.icons.outlined.Folder
+import com.nice.cxonechat.ui.composable.icons.outlined.Image
+import com.nice.cxonechat.ui.composable.icons.outlined.VideoAdd
 import com.nice.cxonechat.ui.composable.theme.ChatTheme
-import com.nice.cxonechat.ui.data.AllowedFileType
-import com.nice.cxonechat.ui.data.AllowedFileTypeSource
+import com.nice.cxonechat.ui.composable.theme.ChatTheme.chatColors
+import com.nice.cxonechat.ui.composable.theme.ChatTheme.colorScheme
+import com.nice.cxonechat.ui.composable.theme.ChatTheme.space
+import com.nice.cxonechat.ui.data.source.AllowedFileType
+import com.nice.cxonechat.ui.data.source.AllowedFileTypeSource
+import com.nice.cxonechat.ui.domain.AttachmentOption.CameraPhoto
+import com.nice.cxonechat.ui.domain.AttachmentOption.CameraVideo
+import com.nice.cxonechat.ui.domain.AttachmentOption.File
+import com.nice.cxonechat.ui.domain.AttachmentOption.ImageAndVideo
 import com.nice.cxonechat.ui.domain.GetAllowedAttachmentGroups
+import com.nice.cxonechat.ui.domain.MimeTypeGroup
 import org.koin.compose.getKoin
+import java.util.EnumMap
 
+/**
+ * Displays a view for selecting an attachment type.
+ *
+ * @param onDismiss Callback invoked when the view is dismissed.
+ * @param getContent Callback invoked with the selected attachment type.
+ * @param allowedFileTypeSource Source of allowed file types for attachments.
+ */
 @Composable
 internal fun AttachmentPickerDialog(
-    onDismissed: () -> Unit,
-    getContent: (mimeType: Collection<String>) -> Unit,
+    onDismiss: () -> Unit,
+    getContent: (attachmentType: AttachmentType) -> Unit,
     allowedFileTypeSource: AllowedFileTypeSource = getKoin().get(),
 ) {
-    val (selectedOption, onOptionSelected) = remember { mutableStateOf<Collection<String>?>(null) }
     val allowedFileTypes = allowedFileTypeSource.allowedMimeTypes
-    AlertDialog(
-        onDismissRequest = onDismissed,
-        dismissButton = {
-            Button(onClick = {
-                onDismissed()
-            }) {
-                Text(text = stringResource(string.cancel))
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                selectedOption?.let(getContent)
-                onDismissed()
-            }) {
-                Text(text = stringResource(string.ok))
-            }
-        },
-        title = {
-            Text(text = stringResource(string.title_attachment_picker))
-        },
-        text = {
-            AttachmentPickerDialogContent(allowedFileTypes, selectedOption, onOptionSelected)
+    AttachmentPickerBottomSheet(
+        onDismiss = onDismiss,
+        content = {
+            BottomSheetTitle(stringResource(string.title_attachment_picker))
+            AttachmentPickerDialogContent(
+                allowedFileTypes = allowedFileTypes,
+                onOptionSelected = {
+                    getContent(it)
+                    onDismiss()
+                }
+            )
         }
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AttachmentPickerBottomSheet(
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable (ColumnScope.() -> Unit),
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        dragHandle = { BottomSheetDefaults.DragHandle(color = chatColors.token.content.tertiary) },
+        containerColor = chatColors.token.background.surface.subtle,
+        contentColor = chatColors.token.content.primary,
+        modifier = modifier
+            .testTag("attachment_picker_bottom_sheet")
+            .systemBarsPadding(),
+        content = content,
+    )
+}
+
+/**
+ * Content of the attachment picker dialog.
+ *
+ * @param allowedFileTypes List of allowed file types for attachments.
+ * @param onOptionSelected Callback invoked when an attachment type is selected.
+ */
 @Composable
 private fun AttachmentPickerDialogContent(
     allowedFileTypes: List<AllowedFileType>,
-    selectedOption: Collection<String>?,
-    onOptionSelected: (Collection<String>?) -> Unit,
+    onOptionSelected: (attachmentType: AttachmentType) -> Unit,
 ) {
     Column(
         modifier = Modifier
             .verticalScroll(rememberScrollState())
             .height(Max)
     ) {
-        val labels = stringArrayResource(R.array.attachment_type_labels)
-        val options = stringArrayResource(R.array.attachment_type_mimetypes)
+        val attachmentOptions = EnumMap(
+            mapOf(
+                CameraPhoto to stringResource(string.attachment_type_camera_image),
+                CameraVideo to stringResource(string.attachment_type_camera_video),
+                ImageAndVideo to stringResource(string.attachment_type_media),
+                File to stringResource(string.attachment_type_file),
+            )
+        )
         val allowedAttachmentGroups = remember {
             GetAllowedAttachmentGroups.allowedAttachmentGroups(
-                labels.asIterable(),
-                options.asIterable(),
+                attachmentOptions,
                 allowedFileTypes,
             )
         }
-        allowedAttachmentGroups.forEach { (label, option) ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .selectable(
-                        selected = selectedOption != null && option.containsAll(selectedOption),
-                        onClick = { onOptionSelected(option) }
-                    )
-                    .padding(horizontal = ChatTheme.space.large),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                RadioButton(
-                    selected = selectedOption != null && option.containsAll(selectedOption),
-                    onClick = { onOptionSelected(option) }
-                )
-                Text(
-                    text = label,
-                    style = ChatTheme.typography.bodyLarge.merge(),
-                    modifier = Modifier.padding(start = ChatTheme.space.large)
-                )
+        val icons = remember { allowedAttachmentGroups.prepareIcons() }
+        allowedAttachmentGroups.forEachIndexed { i, (label, option) ->
+            if (i > 0) {
+                HorizontalDivider(color = chatColors.token.border.default)
             }
+            BottomSheetActionRow(
+                text = label,
+                onClick = { onOptionSelected(option) },
+                testTag = "option_$i",
+                leadingContent = { LeadingIcon(remember { icons[option] }, label) },
+                trailingContent = { TrailingArrow() }
+            )
         }
     }
 }
 
-@Preview
+@Composable
+private fun LeadingIcon(icon: ImageVector?, label: String) {
+    if (icon != null) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            modifier = Modifier.size(space.bottomSheetActionItemSize)
+        )
+    }
+}
+
+@Composable
+private fun TrailingArrow() {
+    Icon(
+        imageVector = Icons.AutoMirrored.Default.ArrowRight,
+        contentDescription = stringResource(string.select),
+        tint = chatColors.token.content.primary,
+        modifier = Modifier.size(space.xl)
+    )
+}
+
+private fun List<MimeTypeGroup>.prepareIcons() = associate {
+    when (val option = it.options) {
+        AttachmentType.CameraPhoto -> option to ChatIcons.Camera
+        AttachmentType.CameraVideo -> option to ChatIcons.VideoAdd
+        is AttachmentType.File -> option to ChatIcons.Folder
+        else -> option to ChatIcons.Image
+    }
+}
+
+@PreviewLightDark
 @Composable
 private fun DialogPreview() {
     ChatTheme {
-        Column {
-            val (selection, onSelected) = remember { mutableStateOf<Collection<String>?>(null) }
-            val labels = stringArrayResource(R.array.attachment_type_labels)
-            val options = stringArrayResource(R.array.attachment_type_mimetypes)
-            if (selection == null) {
-                AttachmentPickerDialog(
-                    onDismissed = {},
-                    getContent = { onSelected(it) },
-                    allowedFileTypeSource = object : AllowedFileTypeSource {
-                        override val allowedMimeTypes: List<AllowedFileType> = labels
-                            .zip(options)
-                            .map(::AllowedFileType)
-                    }
-                )
-            }
-            Text(text = selection?.joinToString() ?: "Nothing")
-            Button(onClick = { onSelected(null) }) {
-                Text(text = "Reset dialog")
-            }
+        Surface(modifier = Modifier.systemBarsPadding(), color = colorScheme.background) {
+            AttachmentPickerDialog(
+                onDismiss = {},
+                getContent = {},
+                allowedFileTypeSource = object : AllowedFileTypeSource {
+                    override val allowedMimeTypes: List<AllowedFileType> = listOf(
+                        AllowedFileType(
+                            mimeType = "image/*",
+                            description = stringResource(string.attachment_type_camera_image)
+                        ),
+                        AllowedFileType(
+                            mimeType = "video/*",
+                            description = stringResource(string.attachment_type_camera_video)
+                        )
+                    )
+                }
+            )
         }
     }
 }
